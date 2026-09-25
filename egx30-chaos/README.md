@@ -26,6 +26,7 @@ fractional Gaussian noise) before it is applied to EGX30.
 | `R/breaks.R` | strucchange (Bai–Perron), changepoint (PELT), ecp (E-divisive), MSGARCH, tvgarch |
 | `R/validation.R` | validation table, Monte Carlo operating characteristics, R/S size/power |
 | `report.qmd` | Quarto report, rendered by the pipeline to `report.html` |
+| `docs/data_quality_report.md` | date/price error audit of the EGX30 file (corrupted row, impact, fixes) |
 | `tests/testthat/` | unit tests against known values (run `testthat::test_dir("tests/testthat")`) |
 | `references/` | JSS/R Journal material; `MANIFEST.csv` records the source of each file |
 | `scripts/download_references.R` | fetches the JSS replication archives and the DChaos article |
