@@ -1,0 +1,398 @@
+---
+title: "Chaos in the EGX30? A replication of Morad, Rady & Amin (2019)"
+subtitle: "Replication, referee-requested revisions, and a validated chaos toolkit"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: true
+    embed-resources: true
+    df-print: kable
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+library(targets)
+library(ggplot2)
+for (f in list.files("R", full.names = TRUE)) source(f)
+kt <- function(x, digits = 3, ...) knitr::kable(x, digits = digits, row.names = FALSE, ...)
+# Validated categorical palette (4 slots), paired with linetype/shape so
+# identity never rests on colour alone.
+PAL <- c("#2a78d6", "#eb6834", "#1baf7a", "#eda100")
+theme_set(theme_minimal(base_size = 11) +
+  theme(panel.grid.minor = element_blank(),
+        panel.grid.major = element_line(colour = "#e6e6e3", linewidth = 0.3),
+        legend.position = "top", plot.title.position = "plot"))
+fmt <- function(x, d = 3) formatC(x, format = "f", digits = d)
+```
+
+```{r load}
+tar_load(c(egx_audit, rep_table1, rep_unit_root, rep_acf, rep_ar_ic, rep_ar2,
+           rep_spectrum, rep_vr_misapplied, rep_bds, rep_rs, rep_hurst,
+           rep_hurst_boot, rep_lo, val_table, val_truth, val_corr_dim,
+           val_bds_boot_garch, val_mc, val_rs, vr_paper, vr_full, ar_ic_full,
+           garch_paper, garch_full, archlm_paper, archlm_full, bds_garch_paper,
+           bds_garch_full, bds_boot_paper, bds_boot_full, long_mem_paper,
+           long_mem_full, lo_paper, lo_full, chaos_ar_paper, chaos_ar_full,
+           chaos_garch_paper, chaos_garch_full, brk_bp, brk_pelt, brk_ecp,
+           brk_ms, brk_tv, brk_tv_bds, sub_table, sub_nogap, ret_full, ret_paper))
+```
+
+{{< include _findings.qmd >}}
+
+# Data
+
+The supplied file `data/raw/egx30_2000_2025.csv` holds daily EGX30 closes.
+The paper used January 1998 – December 2015 (N = 4,393 returns). The file starts
+on 2 January 2000, so the **paper window here is 2000–2015** (N = `r nrow(ret_paper)`).
+The difference of `r 4393 - nrow(ret_paper)` returns is almost exactly two
+trading years (1998–1999), so the paper's N is consistent with this source.
+
+```{r audit-coverage}
+kt(egx_audit$coverage)
+```
+
+**Cleaning.** One row was removed. The EGX trades Sunday–Thursday, and
+`r format(egx_audit$dropped_rows$date)` is a Saturday that repeats the previous
+close, so it is a stale carry-forward:
+
+```{r audit-dropped}
+kt(egx_audit$dropped_rows, 2)
+```
+
+**Calendar.** Rows by weekday and by year. No Friday rows remain.
+2011 is short because of the eight-week closure, and 2025 ends on 30 October.
+
+```{r audit-calendar}
+kt(egx_audit$weekdays)
+kt(t(setNames(egx_audit$per_year$obs, egx_audit$per_year$year)), 0)
+```
+
+**Gaps of a week or more.** A log return across a gap spans more than one
+trading day. The 27 Jan – 23 Mar 2011 closure produces a single −9.3% return
+over 55 calendar days. Every analysis keeps it, and a sensitivity check drops it
+(@sec-subsamples).
+
+```{r audit-gaps}
+kt(egx_audit$gaps, 4)
+```
+
+**Largest moves and key events.** The largest moves line up with known events:
+the January 2003 float of the pound, October 2008, January 2011, and the
+3 November 2016 float. There are no isolated spikes that reverse the next day,
+which would point to data errors. Stale prices are negligible: only
+`r egx_audit$coverage$zero_returns` zero returns and no run of identical closes
+longer than two days.
+
+```{r audit-moves}
+kt(egx_audit$largest_moves, 4)
+```
+
+```{r fig-returns, fig.height=3.2, fig.cap="EGX30 daily log returns, 2000–2025. Dashed lines: 2011 closure and November 2016 float."}
+ggplot(ret_full, aes(date, r)) +
+  geom_line(linewidth = 0.25, colour = PAL[1]) +
+  geom_vline(xintercept = as.Date(c("2011-01-27", "2016-11-03")), linetype = 2, colour = "grey45") +
+  labs(x = NULL, y = "log return")
+```
+
+# Validating the toolkit {#sec-validation}
+
+Before any test is applied to EGX30 it is run on series with known dynamics:
+the logistic map at r = 4 (chaotic, λ = ln 2 = 0.693), the same map with
+measurement noise (sd 0.05), the logistic map at r = 3.5 (periodic), GARCH(1,1)-t
+and AR(1)-GJR-GARCH-t noise (stochastic, non-IID, not chaotic), IID Gaussian
+noise, and fractional Gaussian noise with H = 0.7 (long memory). All series have
+n = 3,000.
+
+```{r val-table}
+v <- merge(val_truth[, c("series", "chaotic", "true_lle", "true_H")], val_table, by = "series", sort = FALSE)
+kt(v, 3)
+```
+
+Column key: `bds_*` are BDS W at m = 2, ε = 1 sd, on the raw series and on
+GARCH(1,1) standardized residuals. `H_AL` is the Anis–Lloyd–Peters corrected
+Hurst exponent and `lw_d` the local-Whittle d. `tau_ami` is the AMI
+first-minimum delay, reported only. `cao_m` is Cao's embedding dimension (NA
+means no saturation). `D2_m*` is the correlation dimension. `K01` is the 0–1
+test. `nn_*` is the nearest-neighbour forecast MSE relative to the mean, with
+its Diebold–Mariano p-value. `lle` and `lle_p_H0_chaos` are the DChaos
+neural-network largest Lyapunov exponent and the p-value for H₀: λ ≥ 0.
+
+```{r fig-corrdim, fig.height=3.4, fig.cap="Correlation dimension D2 against embedding dimension m. Deterministic low-dimensional data saturate; noise tracks the diagonal."}
+cd <- val_corr_dim[val_corr_dim$series %in% c("logistic_r4", "logistic_r4_noisy", "garch_t", "iid_gaussian"), ]
+cd$series <- factor(cd$series, levels = c("logistic_r4", "logistic_r4_noisy", "garch_t", "iid_gaussian"))
+ggplot(cd, aes(m, D2, colour = series, linetype = series, shape = series)) +
+  geom_abline(slope = 1, intercept = 0, colour = "grey70", linewidth = 0.3) +
+  geom_line(linewidth = 0.6) + geom_point(size = 2.2) +
+  scale_colour_manual(values = PAL) + labs(colour = NULL, linetype = NULL, shape = NULL, y = "D2")
+```
+
+```{r val-corrdim-table}
+kt(reshape(val_corr_dim, idvar = "series", timevar = "m", direction = "wide"), 2)
+```
+
+**Monte Carlo operating characteristics** (`r MC <- val_mc; nrow(MC)` DGPs,
+25 replications each, n = 2,000): the share of replications in which each
+diagnostic points to nonlinearity or chaos.
+
+```{r val-mc}
+kt(val_mc, 2)
+```
+
+**R/S, Lo and local Whittle on IID, fGn and GARCH** (200 replications, n = 3,000):
+mean H, mean corrected H, Lo's rejection rate at 5% with Andrews' q, and mean d.
+
+```{r val-rs}
+kt(val_rs, 3)
+```
+
+**BDS on GARCH residuals needs bootstrap critical values.** On the simulated
+GARCH-t series (which *is* GARCH), the parametric bootstrap gives these
+central 95% intervals for W on the standardized residuals:
+
+```{r val-bdsboot}
+kt(val_bds_boot_garch, 3)
+```
+
+# Replication of the paper (2000–2015)
+
+## Descriptive statistics (Table 1)
+
+```{r t1}
+kt(rep_table1, 5)
+```
+
+## Unit roots (Table 2) and linear dependence (Figs 2–3)
+
+```{r t2}
+kt(rep_unit_root, 3)
+```
+
+```{r acf}
+kt(rep_acf, 3)
+bic <- attr(rep_ar_ic, "best")
+```
+
+Information criteria for the AR order: AIC selects p = `r bic[["aic"]]`, BIC
+selects p = `r bic[["bic"]]`. The paper's AR(2) is kept for comparability. Its
+residuals still fail Ljung–Box:
+
+```{r lb}
+kt(rep_ar2$ljung_box, 4)
+```
+
+## Power spectrum (Fig. 4)
+
+```{r fig-spec, fig.height=3.2, fig.cap="Smoothed periodogram of EGX30 returns (2000–2015), log–log. The spectrum is flat or falling toward zero frequency (short-range positive autocorrelation); long memory would make it rise toward zero."}
+ggplot(rep_spectrum, aes(freq, spec)) + geom_line(colour = PAL[1], linewidth = 0.5) +
+  scale_x_log10() + scale_y_log10() + labs(x = "frequency (cycles/day)", y = "spectral density")
+```
+
+## Variance ratios (Table 3)
+
+The paper's variance ratios are reproduced to two or three digits when the
+Lo–MacKinlay statistic is computed on the **first difference of the returns**,
+not on the returns themselves (referee M3):
+
+```{r t3}
+kt(rep_vr_misapplied, 4)
+```
+
+## BDS (Table 4)
+
+The Gaussian column is the mean over 100 replications instead of a single draw.
+
+```{r t4}
+kt(rep_bds, 3)
+```
+
+## Rescaled range (Tables 5–6, Figs 5–6)
+
+```{r fig-rs, fig.height=6, fig.cap="Classical R/S (top) and V-statistic (bottom) on the paper's sub-period grid. The dotted line is the Anis–Lloyd–Peters expectation under IID."}
+rs <- do.call(rbind, lapply(names(rep_rs), function(n) cbind(series = n, rep_rs[[n]])))
+rs$series <- factor(rs$series, levels = names(rep_rs))
+ex <- rep_rs$original
+p1 <- ggplot(rs, aes(log_n, log_rs, colour = series, shape = series)) +
+  geom_line(data = ex, aes(log_n, log10(e_rs)), inherit.aes = FALSE, linetype = 3, colour = "grey40") +
+  geom_point(size = 2) + geom_line(linewidth = 0.4) + scale_colour_manual(values = PAL) +
+  labs(x = "log10 n", y = "log10 R/S", colour = NULL, shape = NULL)
+p2 <- ggplot(rs, aes(log_n, v_stat, colour = series, shape = series)) +
+  geom_line(data = ex, aes(log_n, v_expected), inherit.aes = FALSE, linetype = 3, colour = "grey40") +
+  geom_point(size = 2) + geom_line(linewidth = 0.4) + scale_colour_manual(values = PAL) +
+  labs(x = "log10 n", y = "V statistic", colour = NULL, shape = NULL)
+print(p1); print(p2)
+```
+
+```{r t5}
+kt(rep_rs$filtered[, c("n", "blocks", "leftover", "log_rs", "v_stat", "e_rs")], 4)
+```
+
+`leftover` is the number of observations that do not fit into whole sub-periods.
+No n in the paper's grid divides N (referee M5.3). The longest sub-periods rest
+on only three blocks.
+
+Hurst exponents by range (Table 6, Part A). `H` is the classical estimate,
+`H_AL` the Anis–Lloyd–Peters corrected one:
+
+```{r t6a}
+kt(rep_hurst, 4)
+```
+
+Bootstrap under IID nulls (Table 6, Part B; `r format(2000)` draws each). The
+p-values are one-sided for persistence (H above the null) and two-sided:
+
+```{r t6b}
+kt(rep_hurst_boot, 4)
+```
+
+## Lo's modified R/S (Table 7)
+
+Lo's (1991) two-sided 95% acceptance region is [0.809, 1.862]. The 99% region
+is [0.721, 2.098]; 0.721 is the 0.5% fractile, not a 5% critical value.
+
+```{r t7}
+kt(rep_lo, 3)
+```
+
+# Referee revisions
+
+Each block reports the paper window (2000–2015) and the full sample (2000–2025).
+
+## Variance ratios on the correct series (M3)
+
+```{r vr}
+for (s in c("paper", "full")) {
+  v <- get(paste0("vr_", s))
+  cat("\n**", s, "**\n", sep = "")
+  print(kt(v$lo_mackinlay, 3)); print(kt(v$chow_denning, 3)); print(kt(v$wild_bootstrap_p, 4))
+}
+```
+
+## Conditional heteroskedasticity and BDS (M2)
+
+```{r garch-ic}
+kt(rbind(cbind(sample = "2000-2015", garch_paper$ic), cbind(sample = "2000-2025", garch_full$ic)), 4)
+```
+
+ARCH-LM before and after filtering:
+
+```{r archlm}
+kt(rbind(cbind(sample = "2000-2015", archlm_paper), cbind(sample = "2000-2025", archlm_full)), 4)
+```
+
+BDS on GARCH-standardized residuals, with asymptotic p-values:
+
+```{r bds-garch}
+kt(rbind(cbind(sample = "2000-2015", bds_garch_paper), cbind(sample = "2000-2025", bds_garch_full)), 3)
+```
+
+BDS on AR(2)-GJR-t residuals with parametric-bootstrap p-values and 95% bands
+(`r attr(bds_boot_paper, "B_used")` and `r attr(bds_boot_full, "B_used")` successful refits):
+
+```{r bds-boot}
+kt(rbind(cbind(sample = "2000-2015", bds_boot_paper), cbind(sample = "2000-2025", bds_boot_full)), 3)
+```
+
+## Long memory (M4–M6)
+
+```{r longmem}
+kt(rbind(cbind(sample = "2000-2015", long_mem_paper), cbind(sample = "2000-2025", long_mem_full)), 3)
+kt(rbind(cbind(sample = "2000-2015", lo_paper), cbind(sample = "2000-2025", lo_full)), 3)
+```
+
+## Chaos-specific diagnostics (M1)
+
+```{r chaos}
+chaos_row <- function(cb, label) data.frame(
+  series = label, tau_ami = cb$embedding[["tau_ami_min"]], cao_m = cb$embedding[["m"]],
+  D2_m2 = cb$corr_dim$D2[2], D2_m4 = cb$corr_dim$D2[4], D2_m8 = cb$corr_dim$D2[8],
+  K01 = cb$zero_one[["K"]], nn_mse_ratio = cb$nn$mse_ratio, nn_p = cb$nn$p_nn_better,
+  lle = cb$lle$lle, lle_se = cb$lle$se, lle_p_H0_chaos = cb$lle$p_H0_chaos)
+ch <- rbind(chaos_row(chaos_ar_paper, "2000-2015 AR(2) resid."),
+            chaos_row(chaos_garch_paper, "2000-2015 GJR std. resid."),
+            chaos_row(chaos_ar_full, "2000-2025 AR(2) resid."),
+            chaos_row(chaos_garch_full, "2000-2025 GJR std. resid."))
+kt(ch, 3)
+```
+
+```{r fig-egx-corrdim, fig.height=3.2, fig.cap="Correlation dimension of EGX30 filtered returns against m, with the logistic map for reference."}
+eg <- rbind(cbind(series = "EGX30 AR(2) resid. 2000-2025", chaos_ar_full$corr_dim),
+            cbind(series = "EGX30 GJR std. resid. 2000-2025", chaos_garch_full$corr_dim),
+            cbind(series = "logistic r=4", val_corr_dim[val_corr_dim$series == "logistic_r4", c("m", "D2")]),
+            cbind(series = "IID Gaussian", val_corr_dim[val_corr_dim$series == "iid_gaussian", c("m", "D2")]))
+ggplot(eg, aes(m, D2, colour = series, linetype = series, shape = series)) +
+  geom_abline(slope = 1, intercept = 0, colour = "grey70", linewidth = 0.3) +
+  geom_line(linewidth = 0.6) + geom_point(size = 2.2) + scale_colour_manual(values = PAL) +
+  labs(colour = NULL, linetype = NULL, shape = NULL) + guides(colour = guide_legend(nrow = 2))
+```
+
+## Structural breaks and regimes (M7–M8)
+
+Bai–Perron (strucchange, weekly returns, BIC). Mean breaks:
+`r paste(format(brk_bp$mean$dates), collapse = ", ")`. Volatility breaks:
+`r paste(format(brk_bp$volatility$dates), collapse = ", ")`. The sup-F test for
+a single mean break has p = `r fmt(brk_bp$supF_mean$p.value, 3)`.
+
+E-divisive (ecp, weekly returns) distributional change points:
+`r paste(format(brk_ecp$dates), collapse = ", ")`.
+
+PELT variance regimes (changepoint, daily, MBIC):
+
+```{r pelt}
+kt(brk_pelt$var_segments, 4)
+```
+
+```{r fig-regimes, fig.height=3.2, fig.cap="MS-GJR-t smoothed probability of the high-volatility regime, with PELT variance breaks (vertical ticks)."}
+ms <- data.frame(date = ret_full$date, p = brk_ms$p_high)
+ggplot(ms, aes(date, p)) + geom_area(fill = PAL[1], alpha = 0.35) + geom_line(colour = PAL[1], linewidth = 0.3) +
+  geom_vline(xintercept = brk_pelt$var, colour = "grey45", linewidth = 0.25, linetype = 2) +
+  labs(x = NULL, y = "P(high-vol regime)")
+```
+
+MSGARCH: single- vs two-regime GJR-t (percentage returns):
+
+```{r ms}
+kt(brk_ms$ic, 2)
+kt(data.frame(regime = seq_along(brk_ms$uncond_vol), daily_uncond_vol_pct = brk_ms$uncond_vol), 3)
+kt(as.data.frame(brk_ms$transition), 4)
+```
+
+TV-GARCH (tvgarch): the variance-constancy test selects
+`r brk_tv$test_order_g` transition location(s). BDS on AR(2)-TV-GARCH
+standardized residuals:
+
+```{r tv}
+kt(brk_tv_bds, 3)
+```
+
+## Subsamples {#sec-subsamples}
+
+Diagnostics by period, on AR(2)-GJR-t standardized residuals unless stated.
+
+```{r sub}
+kt(sub_table, 3)
+```
+
+Dropping the 2011 closure-spanning return: N = `r sub_nogap$N`, max |W| =
+`r fmt(sub_nogap$bds_gjr_max_abs_W, 2)`, min p = `r fmt(sub_nogap$bds_gjr_min_p, 3)`.
+
+# Reproducibility
+
+- Pipeline: `targets` (`_targets.R`), with functions in `R/`. Packages are
+  pinned in `renv.lock`, and `report.qmd` is rendered by `tar_quarto()`.
+- Seeds are fixed in `tar_option_set(seed = ...)` and in each bootstrap.
+- Critical values: Lo (1991) Table II. BDS uses ε in units of the series sd.
+- Key settings: DChaos uses the QR (`SLE`) method with bootstrap blocking,
+  m ∈ 1–4, h ∈ 2–10, and B = `r 500`. BDS parametric bootstrap uses B = 199.
+  The Hurst bootstrap uses B = 2,000.
+
+```{r session}
+pk <- c("targets", "tarchetypes", "tseries", "urca", "vrtest", "rugarch", "FinTS",
+        "nonlinearTseries", "DChaos", "strucchange", "changepoint", "ecp", "MSGARCH", "tvgarch")
+kt(data.frame(package = pk, version = vapply(pk, function(p) as.character(packageVersion(p)), "")), 0)
+```

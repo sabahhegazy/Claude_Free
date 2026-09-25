@@ -1,0 +1,7 @@
+Type: project
+Title: EGX30 chaos-analysis replication
+Description: Replication of Morad, Rady & Amin (2019) with referee revisions.
+Depends: R (>= 4.3)
+Imports: targets, tarchetypes, quarto, knitr, rmarkdown, ggplot2, testthat,
+    tseries, urca, vrtest, rugarch, FinTS, nonlinearTseries, DChaos,
+    strucchange, changepoint, ecp, MSGARCH, tvgarch
