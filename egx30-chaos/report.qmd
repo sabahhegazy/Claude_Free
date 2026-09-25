@@ -312,7 +312,8 @@ chaos_row <- function(cb, label) data.frame(
   series = label, tau_ami = cb$embedding[["tau_ami_min"]], cao_m = cb$embedding[["m"]],
   D2_m2 = cb$corr_dim$D2[2], D2_m4 = cb$corr_dim$D2[4], D2_m8 = cb$corr_dim$D2[8],
   K01 = cb$zero_one[["K"]], nn_mse_ratio = cb$nn$mse_ratio, nn_p = cb$nn$p_nn_better,
-  lle = cb$lle$lle, lle_se = cb$lle$se, lle_p_H0_chaos = cb$lle$p_H0_chaos)
+  lle = cb$lle$lle, lle_se = cb$lle$se, lle_p_H0_chaos = cb$lle$p_H0_chaos,
+  lle_m = cb$lle$m_selected, lle_m_max = cb$lle$m_max_used)
 ch <- rbind(chaos_row(chaos_ar_paper, "2000-2015 AR(2) resid."),
             chaos_row(chaos_garch_paper, "2000-2015 GJR std. resid."),
             chaos_row(chaos_ar_full, "2000-2025 AR(2) resid."),

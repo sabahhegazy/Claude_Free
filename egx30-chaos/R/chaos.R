@@ -45,8 +45,11 @@ corr_dimension <- function(x, max_m = 8, lag = 1, theiler = 10, n_max = 2000,
     eps <- exp(seq(log(stats::quantile(dv, c_lo)), log(stats::quantile(dv, c_hi)),
                    length.out = 12))
     C <- findInterval(eps, dv) / length(dv)
-    ok <- C > 0
-    slope <- unname(stats::coef(stats::lm(log(C[ok]) ~ log(eps[ok])))[2])
+    ok <- C > 0 & is.finite(log(eps))
+    # A periodic orbit has only a handful of distinct distances, so the
+    # correlation sum has no scaling region and D2 is undefined (NA).
+    slope <- if (sum(ok) < 3 || length(unique(C[ok])) < 3) NA_real_ else
+      unname(stats::coef(stats::lm(log(C[ok]) ~ log(eps[ok])))[2])
     data.frame(m = m, D2 = slope)
   }))
 }
@@ -87,15 +90,24 @@ zero_one_chaos01 <- function(x, n_c = 100) {
 #' Returns the largest exponent's bootstrap median, its standard error, z and
 #' DChaos's one-sided p-value for H0: lambda >= 0; a small p-value rejects chaos.
 #' The series is standardized first (lambda is scale-free).
+#' If the QR recursion overflows (seen for m up to 4 on GARCH-standardized
+#' EGX30 residuals) the upper bound of m is lowered by one and the fit retried;
+#' `m_max_used` records the range actually searched.
 dchaos_lle <- function(x, m = 1:4, lag = 1, h = 2:10, B = 200, seed = 56666459) {
   x <- (x - mean(x)) / stats::sd(x)
-  res <- DChaos::lyapunov(x, m = m, lag = lag, timelapse = "FIXED", h = h,
-                          w0maxit = 100, wtsmaxit = 1e6, pre.white = TRUE,
-                          lyapmethod = "SLE", blocking = "BOOT", B = B,
-                          trace = 0, seed.t = TRUE, seed = seed, doplot = FALSE)
+  for (m_hi in rev(m)) {
+    res <- tryCatch(
+      DChaos::lyapunov(x, m = min(m):m_hi, lag = lag, timelapse = "FIXED", h = h,
+                       w0maxit = 100, wtsmaxit = 1e6, pre.white = TRUE,
+                       lyapmethod = "SLE", blocking = "BOOT", B = B,
+                       trace = 0, seed.t = TRUE, seed = seed, doplot = FALSE),
+      error = function(e) NULL)
+    if (!is.null(res)) break
+  }
+  if (is.null(res)) stop("DChaos failed for every embedding range")
   e <- res$exponent.median
   data.frame(lle = e[1, 1], se = e[1, 2], z = e[1, 3], p_H0_chaos = e[1, 4],
-             m_selected = nrow(e))
+             m_selected = nrow(e), m_max_used = m_hi)
 }
 
 #' Out-of-sample k-nearest-neighbour (analogue) forecast versus the naive

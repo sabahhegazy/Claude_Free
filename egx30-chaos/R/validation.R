@@ -9,7 +9,8 @@ validate_series <- function(x, name, dchaos_B = 200) {
   z <- if (is.null(g)) NULL else as.numeric(rugarch::residuals(g, standardize = TRUE))
   bds_at <- function(v) if (is.null(v)) NA_real_ else
     tseries::bds.test(v, m = 2, eps = stats::sd(v))$statistic[1]
-  lm <- long_memory_summary(x)
+  # Undefined for a periodic orbit (zero periodogram ordinates), hence NA.
+  lm <- safe(long_memory_summary(x), data.frame(H_rs_AL = NA_real_, lw_d = NA_real_))
   d2 <- cb$corr_dim$D2
   data.frame(
     series = name,

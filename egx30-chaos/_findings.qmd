@@ -1,3 +1,108 @@
-## Summary of findings {.unnumbered}
+# Summary of findings {.unnumbered}
 
-_Filled in after the pipeline run._
+```{r findings-prep}
+vm <- rep_vr_misapplied
+bb_p <- bds_boot_paper; bb_f <- bds_boot_full
+ch_lle <- c(chaos_ar_paper$lle$lle, chaos_garch_paper$lle$lle, chaos_ar_full$lle$lle, chaos_garch_full$lle$lle)
+hb <- rep_hurst_boot[rep_hurst_boot$null == "shuffle", ]
+vt <- val_table
+```
+
+**Bottom line.** The EGX30 data reproduce the paper's descriptive results
+closely. Every test that can separate chaos from noise, once validated,
+**rejects low-dimensional chaos**. The nonlinearity the paper found is
+volatility clustering plus regime shifts in volatility. The long-memory and
+1,240-day-cycle claims do not survive bias correction and correct critical
+values. This supports the referee's recommendation to recast the paper as a
+study of nonlinearity and weak-form efficiency.
+
+**Validation (@sec-validation) shows which tools can be trusted.**
+
+- **DChaos λ̂ discriminates.** It recovers λ = 0.693 on the logistic map
+  (λ̂ = `r fmt(vt$lle[vt$series == "logistic_r4"])`). It stays positive and
+  non-rejected with measurement noise, and is significantly negative for GARCH,
+  IID and fGn. In the Monte Carlo it calls chaos in 0% of GARCH and IID
+  replications and 100% of noisy-logistic ones.
+- **DChaos fails on the periodic map.** On the period-4 map (r = 3.5) it
+  reports λ̂ = `r fmt(vt$lle[vt$series == "logistic_r3.5"])` without rejecting
+  chaos. The neural-net estimator breaks down on a degenerate 4-point orbit, so
+  λ̂ is never read alone. The 0–1 test gets that case right (K ≈ 0).
+- **Nearest-neighbour forecasts discriminate.** They beat the mean
+  forecast only for deterministic data.
+- **The 0–1 test cannot tell noise from chaos.** It gives K ≈ 1 for GARCH
+  and IID noise in 100% of replications. It only separates regular from
+  irregular dynamics, so K ≈ 1 on EGX30 is uninformative.
+- **Raw BDS cannot tell GARCH from chaos.** It rejects IID in 100% of GARCH
+  replications and in 0% once GARCH-filtered.
+- **AMI does not pick the right delay for maps.** It picks τ = 3–7 for the
+  logistic map, whose delay is 1, so all embeddings use τ = 1.
+- **Classical R/S is biased upward.** It gives H ≈
+  `r fmt(val_rs$H[val_rs$dgp == "iid"], 2)` on IID noise; the Anis–Lloyd–Peters
+  correction brings it to `r fmt(val_rs$H_AL[val_rs$dgp == "iid"], 2)`.
+
+**Replication, paper window 2000–2015.**
+
+- **Table 1.** Mean, sd, skewness, kurtosis and IQR match the paper to two or
+  three significant digits. The file lacks 1998–1999, so N = 3,894 rather than
+  4,393.
+- **Table 2.** ADF and PP statistics match in sign and scale. BIC selects
+  AR(`r attr(rep_ar_ic, "best")[["bic"]]`) and AIC selects
+  AR(`r attr(rep_ar_ic, "best")[["aic"]]`); AR(2) residuals fail Ljung–Box.
+- **Table 3 (referee M3 confirmed).** The paper's variance ratios are those of
+  the *differenced* returns: `r paste(fmt(vm$VR, 3), collapse = ", ")` here
+  against `r paste(fmt(vm$paper_VR, 3), collapse = ", ")` printed. Computed
+  correctly, VR(2) = `r fmt(vr_paper$lo_mackinlay$VR[1])` (> 1), with
+  robust z₂ = `r fmt(vr_paper$lo_mackinlay$z2[1], 1)`. The random walk is
+  rejected because of *positive* autocorrelation, the opposite of what the
+  paper's Table 3 implies.
+- **Table 4.** BDS on raw and AR(2)-filtered returns is huge (W = 13–29). The
+  AR(2) filter barely changes it, confirming the rejection is not linear.
+- **Tables 5–6 (referee M5 confirmed).** No sub-period length in the paper's
+  grid divides N. With the corrected H and 2,000 shuffles, only the full
+  10–1,240 range is significant (one-sided p =
+  `r fmt(hb$p_upper[4], 3)`), and the corrected H is only
+  `r fmt(hb$H_AL_obs[4], 3)`. Over 350–700, H =
+  `r fmt(hb$H_obs[3], 2)`, which is *below* 0.5 and contradicts the paper.
+- **Table 7 (referee M6 confirmed).** With Lo's correct 95% region
+  [0.809, 1.862], V exceeds the bound only for q ≤ 16. It never exceeds the 99%
+  bound, and it falls to 1.48–1.76 once q ≥ N^½. That is short-range dependence,
+  not long memory.
+
+**Referee revisions.**
+
+- **M2: GARCH-filtered BDS.**
+  - **Filtering removes almost all of the rejection.** After AR(2)-GJR-t
+    filtering, BDS falls from W ≈ 16–29 to |W| ≤
+    `r fmt(max(abs(bb_p$W)), 2)` (2000–2015) and ≤ `r fmt(max(abs(bb_f$W)), 2)`
+    (2000–2025).
+  - **Asymptotic p-values.** No asymptotic rejection at 5% in 2000–2015; a few
+    at large ε in 2000–2025.
+  - **Parametric bootstrap.** The bootstrap (199 refits) bands are narrower than
+    N(0,1) at large m and ε. It therefore flags remaining dependence at ε ≥ 1.5 sd
+    and m ≥ 3, where the ARCH-LM test also shows residual ARCH (p ≈ 0.02). That
+    points to a misspecified variance, not to chaos.
+  - **Leverage.** EGARCH finds a significant leverage term; GJR does not in the
+    full sample.
+- **M1: chaos diagnostics on AR(2) and GJR-t residuals, both samples.**
+  - **Lyapunov exponent.** λ̂ ranges from `r fmt(min(ch_lle), 2)` to
+    `r fmt(max(ch_lle), 2)`. It is negative, and H₀: λ ≥ 0 is rejected in every
+    case.
+  - **Correlation dimension.** It does not saturate; it grows with m like
+    IID noise.
+  - **Cao's method.** It finds no embedding dimension.
+  - **Nearest-neighbour forecasts.** Out-of-sample MSE is 7–11% *worse* than
+    the mean forecast.
+- **M4: long memory.** Local-Whittle d is `r fmt(long_mem_paper$lw_d[1], 3)`
+  (se `r fmt(long_mem_paper$lw_se[1], 3)`) for 2000–2015. The larger GPH
+  estimates use m = √N and pick up the short-range AR component.
+- **M7: breaks and regimes.**
+  - **Break tests agree.** strucchange, ecp and PELT locate breaks around the
+    2003 pound float, the 2008 crisis, 2011–12 and the 2020 COVID shock.
+  - **Regime-switching volatility fits better.** MS-GJR-t beats single-regime
+    GJR-t by BIC, with daily volatilities of
+    `r paste(fmt(brk_ms$uncond_vol, 2), collapse = "% and ")`% and very
+    persistent regimes. TV-GARCH detects a shift in unconditional variance.
+- **M8: subsamples.** λ̂ is negative in every subsample, before and after the
+  November 2016 float, and dropping the 2011 closure return changes nothing.
+  The magnitude of λ̂ is unstable across subsamples (the neural-net estimator is
+  noisy); its sign is not.
