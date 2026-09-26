@@ -1,37 +1,93 @@
 # EGX30 input handling ---------------------------------------------------------
 
-#' Read a daily EGX30 price file.
-#'
-#' Accepts any CSV with a date column and a closing-price column (e.g. exports
-#' from egx.com.eg, Investing.com, Refinitiv or Bloomberg). Column names are
-#' matched case-insensitively; thousands separators are stripped.
+MONTHS <- c(jan = 1, feb = 2, mar = 3, apr = 4, may = 5, jun = 6,
+            jul = 7, aug = 8, sep = 9, oct = 10, nov = 11, dec = 12)
+
+#' Replace English month abbreviations with numbers before parsing, so "%b" is
+#' never used. R matches "%b" against the machine's locale, and under French or
+#' Arabic locales it parses nothing (see docs/data_quality_report.md, 6.1).
+parse_dates <- function(x) {
+  if (inherits(x, "Date")) return(x)
+  x <- trimws(as.character(x))
+  num <- x
+  for (m in names(MONTHS)) {
+    num <- gsub(paste0("(?i)\\b", m, "[a-z]*\\b"), sprintf("%02d", MONTHS[[m]]), num, perl = TRUE)
+  }
+  num <- gsub(",", "", num)
+  # 4-digit-year formats come first: as.Date() ignores trailing characters, so
+  # "%d-%m-%y" would read "02-01-2000" as 2020-01-02. On a tie in the number
+  # of parsed dates the earlier format wins; a 4-digit format applied to a
+  # 2-digit year yields a year < 1900, which the guard below rejects.
+  fmts <- c("%d-%m-%Y", "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%m %d %Y", "%d.%m.%Y", "%d-%m-%y")
+  best <- NULL
+  for (f in fmts) {
+    d <- as.Date(num, format = f)
+    # Guard against 2-digit years parsed by a 4-digit format (year < 1900).
+    d[!is.na(d) & as.integer(format(d, "%Y")) < 1900] <- NA
+    if (is.null(best) || sum(!is.na(d)) > sum(!is.na(best))) best <- d
+  }
+  best
+}
+
+# Read a daily EGX30 price file: any CSV with a date column and a close column.
+# Every row removed at this stage is counted and reported; more than 1% of
+# unparseable rows stops the script instead of silently shrinking the sample.
 read_egx30 <- function(path) {
-  raw <- utils::read.csv(path, check.names = FALSE, stringsAsFactors = FALSE)
+  if (!file.exists(path)) {
+    stop("Data file not found: ", path, "\nCheck the egx_file target in _targets.R.",
+         call. = FALSE)
+  }
+  raw <- utils::read.csv(path, check.names = FALSE, stringsAsFactors = FALSE,
+                         colClasses = "character", strip.white = TRUE)
   nms <- tolower(trimws(names(raw)))
   date_col <- which(nms %in% c("date", "trade date", "day"))[1]
   close_col <- which(nms %in% c("close", "closing", "price", "last", "adj close",
                                 "close price", "egx30", "value"))[1]
   if (is.na(date_col) || is.na(close_col)) {
     stop("Could not find date/close columns in ", path, "; found: ",
-         paste(names(raw), collapse = ", "))
+         paste(names(raw), collapse = ", "), call. = FALSE)
   }
   date <- parse_dates(raw[[date_col]])
-  close <- as.numeric(gsub(",", "", raw[[close_col]]))
+  close <- suppressWarnings(as.numeric(gsub("[, ]", "", raw[[close_col]])))
   out <- data.frame(date = date, close = close)
-  out <- out[!is.na(out$date) & is.finite(out$close) & out$close > 0, ]
-  out <- out[!duplicated(out$date), ]
-  out[order(out$date), ]
+  bad_date <- is.na(out$date)
+  bad_price <- !bad_date & !(is.finite(out$close) & out$close > 0)
+  if (mean(bad_date | bad_price) > 0.01) {
+    stop(sprintf("%d of %d rows have unparseable dates or prices. First bad rows:\n%s",
+                 sum(bad_date | bad_price), nrow(raw),
+                 paste(utils::capture.output(print(head(raw[bad_date | bad_price, c(date_col, close_col)]))), collapse = "\n")),
+         call. = FALSE)
+  }
+  out <- out[!(bad_date | bad_price), ]
+  dup <- duplicated(out$date)
+  out <- out[!dup, ]
+  out <- out[order(out$date), ]
+  message(sprintf("read_egx30: %d rows read, %d bad dates, %d bad prices, %d duplicate dates removed",
+                  nrow(raw), sum(bad_date), sum(bad_price), sum(dup)))
+  attr(out, "n_raw") <- nrow(raw)
+  out
 }
 
-parse_dates <- function(x) {
-  if (inherits(x, "Date")) return(x)
-  fmts <- c("%d-%b-%y", "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y", "%b %d, %Y", "%d.%m.%Y")
-  best <- NULL
-  for (f in fmts) {
-    d <- as.Date(x, format = f)
-    if (is.null(best) || sum(!is.na(d)) > sum(!is.na(best))) best <- d
+# The EGX week is Sunday-Thursday throughout 2000-2025. A Friday/Saturday row
+# that repeats the previous close is a stale carry-forward (2005-06-18 in the
+# supplied file) and is dropped. A weekend row with a *different* close cannot
+# be explained that way, so it is kept but reported for manual review.
+clean_egx30 <- function(prices) {
+  wd <- as.POSIXlt(prices$date)$wday # 0 = Sunday, 5 = Friday, 6 = Saturday
+  weekend <- wd %in% c(5, 6)
+  repeat_close <- c(FALSE, diff(prices$close) == 0)
+  stale <- weekend & repeat_close
+  if (any(weekend & !repeat_close)) {
+    warning("Weekend rows with a new price (kept, please verify):\n",
+            paste(utils::capture.output(print(prices[weekend & !repeat_close, ])), collapse = "\n"),
+            call. = FALSE)
   }
-  best
+  out <- prices[!stale, ]
+  attr(out, "dropped") <- prices[stale, ]
+  attr(out, "weekend_kept") <- prices[weekend & !repeat_close, ]
+  message(sprintf("clean_egx30: %d stale weekend row(s) dropped: %s", sum(stale),
+                  paste(format(prices$date[stale]), collapse = ", ")))
+  out
 }
 
 #' Log returns r_t = log(P_t) - log(P_{t-1}), with trading-calendar gaps flagged.
@@ -48,17 +104,6 @@ calendar_gaps <- function(returns, min_days = 7) {
   g <- returns[returns$gap_days >= min_days, c("date", "gap_days", "r")]
   rownames(g) <- NULL
   g
-}
-
-#' Drop rows the EGX could not have traded on. The EGX week is Sunday-Thursday
-#' throughout 2000-2025, so a Friday/Saturday row that repeats the previous
-#' close is a stale carry-forward (e.g. 2005-06-18 in the supplied file).
-clean_egx30 <- function(prices) {
-  wd <- as.POSIXlt(prices$date)$wday # 0 = Sunday, 5 = Friday, 6 = Saturday
-  stale <- wd %in% c(5, 6) & c(FALSE, diff(prices$close) == 0)
-  out <- prices[!stale, ]
-  attr(out, "dropped") <- prices[stale, ]
-  out
 }
 
 #' Returns with the closure-spanning return removed (sensitivity for the

@@ -23,9 +23,11 @@
    shifts every later observation by one position. No estimate moves by more
    than 0.5%, no test crosses a significance threshold, and no conclusion of
    the replication changes.
-3. **The reader has a more serious latent fault.** Under a non-English locale
-   (verified with French and Arabic/Egypt), `read_egx30()` parses **no** dates
-   and **silently returns zero rows**. It gives no warning.
+3. **The reader had a more serious latent fault, now fixed.** Under a
+   non-English locale (verified with French and Arabic/Egypt), the original
+   `read_egx30()` parsed **no** dates and **silently returned zero rows**. It
+   gave no warning. The reader is now locale-independent and fails loudly
+   (§7.2).
 4. **10 Sep 2002 was investigated and is retained.** It was a genuine trading
    day, and its flat close is consistent with chance (§8.3). One anomaly
    remains unconfirmed and is kept: a ±5–6% three-day oscillation on
@@ -226,10 +228,26 @@ a stale repeat dated on a weekday holiday.
 
 ### 7.2 Harden the reader
 
-**Status:** applied in the Colab script's reader
-(`colab/egx30_replication_colab.R`), which is tested under C, French and
-Arabic locales. Not yet applied to the project's `R/data.R`, because changing
-it invalidates the whole `targets` cache and triggers a full rerun.
+**Status: applied** to both `R/data.R` and the Colab script. The four
+recommendations below are implemented as follows:
+
+1. Month names are mapped to numbers before parsing, so `%b` is never used.
+2. The reader stops when more than 1% of rows fail to parse. It always
+   reports how many rows it read, and how many bad dates, bad prices and
+   duplicate dates it removed.
+3. Weekend rows that repeat the previous close are dropped. Weekend rows with
+   a new price are kept, and the reader raises a warning so they can be
+   reviewed.
+4. Four new tests in `tests/testthat/test-data.R` cover the behaviour:
+   - the file parses identically under French and Arabic locales;
+   - all seven supported date formats parse to the same dates;
+   - unparseable rows stop the reader instead of being dropped silently;
+   - a weekend row with a new price is kept and reported.
+
+The fix changes no result on the supplied file: every pipeline target was
+rebuilt and compared with the previous values (§9).
+
+The original recommendations:
 
 
 1. **Parse months independently of locale.** Map `Jan`–`Dec` to `01`–`12`
@@ -408,4 +426,5 @@ Rscript scripts/scan_egx30_raw.R     # §2.2 checks and §3 evidence
 Rscript scripts/stale_row_impact.R   # §5 impact tables
 LC_ALL=fr_FR.UTF-8 Rscript -e 'source("R/data.R"); nrow(read_egx30("data/raw/egx30_2000_2025.csv"))'   # §6.1, needs the locale installed
 Rscript -e 'targets::tar_make(backfill); print(targets::tar_read(backfill))'   # §8.4
+Rscript -e 'testthat::test_dir("tests/testthat")'   # reader tests for §7.2 (locale tests skip if fr_FR/ar_EG are not installed)
 ```
