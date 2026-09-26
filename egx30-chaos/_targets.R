@@ -120,6 +120,9 @@ breaks <- list(
                lo_V = lm$lo_V_andrews, K01 = zero_one_test(z)[["K"]],
                lle = l$lle, lle_p_H0_chaos = l$p_H0_chaos)
   }, pattern = map(sub_names)),
+  # CASE 30 values before 2 Feb 2003 are a retroactive reconstruction
+  # (CBE Annual Report 2002/2003, p. 87): compare backfilled and live data.
+  tar_target(backfill, backfill_check(ret_full, dchaos_B = 200)),
   tar_target(sub_nogap, {
     x <- drop_long_gaps(ret_full)$r
     b <- bds_grid(as.numeric(rugarch::residuals(fit_garch(x, "gjrGARCH", 2), standardize = TRUE)))

@@ -40,7 +40,7 @@ tar_load(c(egx_audit, rep_table1, rep_unit_root, rep_acf, rep_ar_ic, rep_ar2,
            bds_garch_full, bds_boot_paper, bds_boot_full, long_mem_paper,
            long_mem_full, lo_paper, lo_full, chaos_ar_paper, chaos_ar_full,
            chaos_garch_paper, chaos_garch_full, brk_bp, brk_pelt, brk_ecp,
-           brk_ms, brk_tv, brk_tv_bds, sub_table, sub_nogap, ret_full, ret_paper))
+           brk_ms, brk_tv, brk_tv_bds, sub_table, sub_nogap, backfill, ret_full, ret_paper))
 ```
 
 {{< include _findings.qmd >}}
@@ -381,6 +381,26 @@ kt(sub_table, 3)
 
 Dropping the 2011 closure-spanning return: N = `r sub_nogap$N`, max |W| =
 `r fmt(sub_nogap$bds_gjr_max_abs_W, 2)`, min p = `r fmt(sub_nogap$bds_gjr_min_p, 3)`.
+
+## Backfilled index values {#sec-backfill}
+
+CASE 30 was launched on 2 February 2003 to replace CASE 50. It "was
+retroactively calculated for five years as of 1/1/1998" (CBE Annual Report
+2002/2003, p. 87). Every value before the launch, including the paper's first
+years, is therefore a reconstruction from the 30 stocks that were most liquid
+in 2003, not a published index. The table repeats the main diagnostics on the
+backfilled and live segments. `near_zero_pct` is the share of days with
+|r| < 0.01%, a proxy for thin trading. Annualised figures use 245 days.
+
+```{r backfill-table}
+kt(backfill$segments, 3)
+```
+
+Formal tests of a change at the launch date:
+
+```{r backfill-tests}
+kt(backfill$tests, 4)
+```
 
 # Reproducibility
 

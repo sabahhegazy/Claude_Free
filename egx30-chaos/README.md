@@ -24,6 +24,7 @@ fractional Gaussian noise) before it is applied to EGX30.
 | `R/rescaled_range.R` | classical R/S, V-statistic, Anis–Lloyd–Peters correction, Hurst bootstrap, Lo's modified R/S, DFA, GPH, local Whittle |
 | `R/chaos.R` | AMI/Cao embedding, Grassberger–Procaccia D2, 0–1 test, DChaos Lyapunov exponent, nearest-neighbour forecasts with Diebold–Mariano |
 | `R/breaks.R` | strucchange (Bai–Perron), changepoint (PELT), ecp (E-divisive), MSGARCH, tvgarch |
+| `R/backfill.R` | split-sample check around the 2 Feb 2003 CASE 30 launch (earlier values are backfilled) |
 | `R/validation.R` | validation table, Monte Carlo operating characteristics, R/S size/power |
 | `report.qmd` | Quarto report, rendered by the pipeline to `report.html` |
 | `colab/` | self-contained Google Colab version: one R script and a generated R-runtime notebook (see `colab/README.md`) |

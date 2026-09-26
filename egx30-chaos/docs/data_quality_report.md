@@ -7,6 +7,7 @@
 | Span | 2 Jan 2000 – 30 Oct 2025 |
 | Reader | `R/data.R`: `read_egx30()` parses the file, then `clean_egx30()` removes rows the EGX could not have traded on |
 | Evidence | `scripts/scan_egx30_raw.R` (independent scan) and `scripts/stale_row_impact.R` (with/without comparison) |
+| External sources | EGX Annual Report 2005 and CBE Annual Report 2002/2003, both in the project's Google Drive `EGX30_Report` folder (§8) |
 
 ## 1. Summary
 
@@ -16,6 +17,8 @@
      previous row (Thursday 16 June) to the cent. It is a stale carry-forward
      stamped with a non-trading day.
    - **Status:** the pipeline removes it, and the raw file is left unmodified.
+   - **External confirmation:** the EGX's official session count for 2005 is
+     249, one fewer than the file's 250 rows (§8.1).
 2. **The row's impact is negligible.** It inserts one spurious zero return and
    shifts every later observation by one position. No estimate moves by more
    than 0.5%, no test crosses a significance threshold, and no conclusion of
@@ -23,10 +26,16 @@
 3. **The reader has a more serious latent fault.** Under a non-English locale
    (verified with French and Arabic/Egypt), `read_egx30()` parses **no** dates
    and **silently returns zero rows**. It gives no warning.
-4. **Two anomalies are unconfirmed.** Both are plausible, and neither can be
-   settled without a second data source. Both are kept.
-   - An exact weekday close repeat on 10 Sep 2002.
-   - A ±5–6% three-day oscillation on 28–30 Apr 2024.
+4. **10 Sep 2002 was investigated and is retained.** It was a genuine trading
+   day, and its flat close is consistent with chance (§8.3). One anomaly
+   remains unconfirmed and is kept: a ±5–6% three-day oscillation on
+   28–30 Apr 2024.
+5. **One 2000 session appears to be missing.** The official count is 248, and
+   the file has 247 rows (§8.2). It can't be identified without a daily source.
+6. **All values before 2 Feb 2003 are backfilled.** CASE 30 was launched on
+   that date and calculated backwards to 1998. The backfilled segment differs
+   in variance and tails, but no conclusion of the replication depends on it
+   (§8.4).
 
 ## 2. Detection method
 
@@ -196,11 +205,11 @@ In this file the count is zero, but a corrupted file would be cleaned silently.
 previous row. A weekend row with a different price would pass through. So would
 a stale repeat dated on a weekday holiday.
 
-### 6.4 Unconfirmed candidates (kept, need a second source)
+### 6.4 Candidates checked for staleness (kept)
 
 | Date | Observation | Assessment |
 |---|---|---|
-| 2002-09-10 (Tue) | Close 474.09, identical to Monday | Plausible genuine flat close: the surrounding days move ±0.2–0.6% at a low index level. Weekday, so not caught by the rule. |
+| 2002-09-10 (Tue) | Close 474.09, identical to Monday | **Resolved: retained.** A genuine trading day, and the flat close is consistent with chance (§8.3). |
 | 2024-04-28 to 04-30 | −5.1%, +5.4%, −6.2% | Inside a sustained sell-off from 28,144 to 24,449. The 25 Apr holiday (Thursday) is correctly absent. Consistent with genuine volatility. |
 
 ## 7. Recommended correction
@@ -215,7 +224,13 @@ a stale repeat dated on a weekday holiday.
   there is nothing to impute. Removing the row gives the Sunday return its
   correct three-day span.
 
-### 7.2 Harden the reader (recommended, not yet applied)
+### 7.2 Harden the reader
+
+**Status:** applied in the Colab script's reader
+(`colab/egx30_replication_colab.R`), which is tested under C, French and
+Arabic locales. Not yet applied to the project's `R/data.R`, because changing
+it invalidates the whole `targets` cache and triggers a full rerun.
+
 
 1. **Parse months independently of locale.** Map `Jan`–`Dec` to `01`–`12`
    explicitly, or wrap parsing in `withr::with_locale(c(LC_TIME = "C"), ...)`.
@@ -229,15 +244,168 @@ a stale repeat dated on a weekday holiday.
    whenever the data file is replaced, for example when 1998–1999 are added
    or the series is extended.
 
-### 7.3 Verify the candidates
+### 7.3 Remaining checks
 
-Check 10 Sep 2002 and 28–30 Apr 2024 against a second source, such as EGX
-bulletins or Refinitiv/Bloomberg. Change them only if that source disagrees.
+1. **28–30 Apr 2024.** Check against a daily source, such as EGX bulletins or
+   Refinitiv/Bloomberg. Change the values only if that source disagrees.
+2. **The missing 2000 session.** Identify it from a daily source for April and
+   October 2000 (§8.2). Add it only with a verified close. Until then, the
+   returns either side of it span two sessions, which has a negligible effect.
+3. **Backfill disclosure.** State in any write-up that CASE 30 values before
+   2 Feb 2003 are reconstructions, and report the split-sample results (§8.4).
 
-## 8. Reproduction
+## 8. External-source verification
+
+### 8.1 18 June 2005: confirmed as an artifact (EGX Annual Report 2005)
+
+Source: `DiscDoc_ID715_31-Dec-2005_ENG.pdf` (20 pages). I read the PDF
+directly.
+
+"Main Market Indicators for the Period 2000–2005" (printed p. 11) gives the
+**Number of Trading Days**:
+
+| Year | Official sessions | Rows in the file | Difference |
+|---|---:|---:|---:|
+| 2000 | 248 | 247 | −1 (§8.2) |
+| 2001 | 246 | 246 | 0 |
+| 2002 | 249 | 249 | 0 |
+| 2003 | 244 | 244 | 0 |
+| 2004 | 249 | 249 | 0 |
+| **2005** | **249** | **250** | **+1** |
+
+What the counts show:
+
+- **Why the comparison is valid.** Four years match exactly, so the EGX counts
+  sessions the same way the file does.
+- **The extra row is 18 June.** The only surplus is in 2005. June 2005 has 22
+  Sunday–Thursday days and 23 rows, and the surplus row is Saturday 18 June.
+  Without it, no June weekday is missing or extra.
+
+The report's index figures also match the file, so the surrounding data are
+correct:
+
+| Report statement | Page | File |
+|---|---|---|
+| End-2005 level: 6,325 | 3 | 6,324.70 |
+| 2005 growth: 146% | 3 | 146.3% |
+| 2003 growth: 135% | 3 | 134.5% |
+| 2004 growth: 122% | 3 | 122.2% |
+| Growth over 2003–2005: 1,183% | 3 | 1,183.3% |
+| End-H1 2005 level: 4,829, +88% | 4 | 4,828.66, +88.0% |
+
+### 8.2 2000: one session missing from the file
+
+The official count is 248 and the file has 247 rows. The file lacks 14
+Sunday–Thursday dates in 2000. Most match public holidays; the holiday dates
+below come from general knowledge of the Egyptian calendar and are approximate:
+
+- Eid al-Fitr: 9–10 Jan and 27–28 Dec
+- Eid al-Adha: 15–16 Mar
+- Islamic New Year: 6 Apr
+- Sinai Day: 25 Apr
+- Sham el-Nessim and Labour Day: 1 May
+- Prophet's Birthday: 15 Jun
+- Revolution Day: 23 Jul
+- Armed Forces Day, observed: 5 Oct
+
+That leaves three candidates for the missing session:
+
+| Candidate | Why it is a candidate |
+|---|---|
+| **26 Apr 2000 (Wed)** | No known holiday |
+| **30 Apr 2000 (Sun)** | Coptic Easter, not usually an exchange holiday |
+| **5 Oct 2000 (Thu)** | A candidate only if Armed Forces Day (Fri 6 Oct) was not bridged |
+
+The effect is negligible: one return spans two sessions instead of one.
+
+### 8.3 10 September 2002: a genuine session, retained (CBE Annual Report 2002/2003)
+
+Source: `CBE/Annual Report 2002-2003.pdf` (130 pages). Drive's text layer
+stops before the Stock Exchange chapter, so I extracted the PDF itself.
+Section 4/5, "The Stock Exchange", is on printed pp. 84–88.
+
+What the report establishes:
+
+- **The official levels match the file.** The listings table (p. 85) gives
+  CASE 30 at 472.1 at end-June 2002 and 775.9 at end-June 2003, up 64.4%
+  (p. 87). The file has 472.07 and 775.88, which is also +64.4%.
+- **The index was backfilled.** CASE 30 "was retroactively calculated for five
+  years as of 1/1/1998 … to replace the former share price index (CASE 50) as
+  of February 2, 2003" (p. 87). The September 2002 value was reconstructed
+  later from constituent closes, so a live data feed going stale that day can't
+  explain the repeat.
+- **The market was thin.** Trading was "calm" for most of FY 2002/03
+  (pp. 84–85). A new closing-price rule used a volume-weighted average only
+  when at least 100 securities traded (p. 84), and the report doesn't date it.
+  In a thin market this rule leaves many constituent prices unchanged from one
+  day to the next.
+- **What the report lacks:** daily values, trading-day counts and anything on
+  September 2002. The statistical annex it lists (Table 9/2, p. 151) is not in
+  the PDF.
+
+Evidence from the calendar and the data:
+
+| Check | Result |
+|---|---|
+| Calendar | A Tuesday with no public holiday. Every Sunday–Thursday in Sep 2002 has a row. |
+| Session count | 249 rows match the official 249 for 2002 (§8.1). All 12 missing Sunday–Thursday dates in 2002 fall on holidays. |
+| Chance of an exact flat close | About 0.27% that day, at the local volatility of about 1.5 index points a day. Across the whole file about 0.8 exact repeats are expected by chance, and 1 is observed on a weekday. |
+| Neighbouring days | Normal small moves: −0.24% on 9 Sep, then +0.16%, +0.54% and +0.60%. |
+
+**Decision:** keep the row. If it were stale after all, it would only turn one
+small return into a zero, the same negligible impact as in §5.
+
+### 8.4 Backfilled index values: split-sample check
+
+The CBE report (p. 87) shows that every CASE 30 value before 2 Feb 2003 is a
+reconstruction from the 30 most liquid stocks of 2003. The pipeline's
+`backfill` target (`R/backfill.R`) repeats the main diagnostics on each
+segment. Values are rounded; the report's "Backfilled index values" section
+has the full table.
+
+| | Backfilled, 2000 – Jan 2003 | Live, Feb 2003 – 2015 | Live, Feb 2003 – 2025 |
+|---|---:|---:|---:|
+| N | 761 | 3,133 | 5,520 |
+| Mean return, annualised | −23.3% | +19.6% | +18.6% |
+| Volatility, annualised | 25.3% | 28.0% | 25.3% |
+| Kurtosis | 4.7 | 12.7 | 12.5 |
+| Days with \|r\| < 0.01% | 1.18% | 0.64% | 0.78% |
+| Lag-1 autocorrelation | 0.197 | 0.159 | 0.158 |
+| Ljung–Box(20) p, AR(2) residuals | 0.33 | 0.001 | < 0.001 |
+| BDS on GJR residuals: min p (asymptotic) | 0.008 | 0.039 | 0.010 |
+| Local-Whittle d (se) | −0.007 (0.058) | 0.067 (0.037) | 0.070 (0.030) |
+| Lo's V (95% bound 1.862) | 1.34 | 1.88 | 2.09 |
+| DChaos λ̂ (p for H₀: chaos) | −10.3 (< 0.001) | −2.8 (< 0.001) | −3.2 (< 0.001) |
+
+Tests for a change at the launch date:
+
+| Test | Statistic | p |
+|---|---:|---:|
+| Chow test, AR(1) coefficients (paper window) | 2.39 | 0.092 |
+| Equal lag-1 autocorrelation (Fisher z) | 0.97 | 0.33 |
+| Equal variance (F test) | 0.82 | 0.0007 |
+
+**Reading.**
+
+- **How the backfilled segment differs.** It has lower variance, much thinner
+  tails and nearly twice as many flat days, which fits an index reconstructed
+  from thinly traded prices. Its negative mean reflects the 2000–2002 bear
+  market, not the backfill itself.
+- **The linear dynamics don't change** at the launch: the autocorrelation
+  difference is not significant, and the Chow test p is 0.09.
+- **Chaos is rejected in every segment.** λ̂'s magnitude is unstable in the
+  short backfilled sample, but its sign is not.
+- **Long memory comes from the live period.** The weak evidence of it, from
+  Lo's V and local-Whittle d, is absent in the backfilled segment.
+- **Conclusion:** no finding of the replication depends on the backfilled
+  years. The paper window's descriptive moments, especially kurtosis, do mix
+  two segments with different distributions, and a write-up should say so.
+
+## 9. Reproduction
 
 ```sh
 Rscript scripts/scan_egx30_raw.R     # §2.2 checks and §3 evidence
 Rscript scripts/stale_row_impact.R   # §5 impact tables
 LC_ALL=fr_FR.UTF-8 Rscript -e 'source("R/data.R"); nrow(read_egx30("data/raw/egx30_2000_2025.csv"))'   # §6.1, needs the locale installed
+Rscript -e 'targets::tar_make(backfill); print(targets::tar_read(backfill))'   # §8.4
 ```

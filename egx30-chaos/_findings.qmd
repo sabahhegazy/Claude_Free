@@ -102,6 +102,15 @@ study of nonlinearity and weak-form efficiency.
     GJR-t by BIC, with daily volatilities of
     `r paste(fmt(brk_ms$uncond_vol, 2), collapse = "% and ")`% and very
     persistent regimes. TV-GARCH detects a shift in unconditional variance.
+- **Backfill (CBE Annual Report 2002/2003).** Values before 2 February 2003
+  are retroactive reconstructions (@sec-backfill). The backfilled segment
+  differs in level and shape: lower variance (F-test p =
+  `r fmt(backfill$tests$p_value[3], 4)`), thinner tails and more flat days.
+  Its lag-1 autocorrelation is not significantly different (p =
+  `r fmt(backfill$tests$p_value[2], 2)`), and the Chow test finds no AR(1)
+  break at the launch (p = `r fmt(backfill$tests$p_value[1], 2)`). λ̂ is
+  negative and rejects chaos in every segment. No conclusion depends on the
+  backfilled years; the weak long-memory evidence comes from the live period.
 - **M8: subsamples.** λ̂ is negative in every subsample, before and after the
   November 2016 float, and dropping the 2011 closure return changes nothing.
   The magnitude of λ̂ is unstable across subsamples (the neural-net estimator is

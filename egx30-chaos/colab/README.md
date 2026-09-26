@@ -75,7 +75,7 @@ can set any of them before the script runs (or before `source()`):
 
 `OUT_DIR` contains the following:
 
-- `tables/`: 34 CSV files, including paper Tables 1–7, the referee revisions,
+- `tables/`: 36 CSV files, including paper Tables 1–7, the referee revisions, the backfill check,
   validation, breaks and subsamples.
 - `figures/`: 7 PNG figures.
 - `results.rds`: every result object, plus the run settings and package

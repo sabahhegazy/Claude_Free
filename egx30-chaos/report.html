@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="dcterms.date" content="2026-09-25">
+<meta name="dcterms.date" content="2026-09-26">
 
 <title>Chaos in the EGX30? A replication of Morad, Rady &amp; Amin (2019)</title>
 <style>
@@ -2165,6 +2165,7 @@ vertical-align: -.125em;
   <li><a href="#chaos-specific-diagnostics-m1" id="toc-chaos-specific-diagnostics-m1" class="nav-link" data-scroll-target="#chaos-specific-diagnostics-m1"><span class="header-section-number">4.4</span> Chaos-specific diagnostics (M1)</a></li>
   <li><a href="#structural-breaks-and-regimes-m7m8" id="toc-structural-breaks-and-regimes-m7m8" class="nav-link" data-scroll-target="#structural-breaks-and-regimes-m7m8"><span class="header-section-number">4.5</span> Structural breaks and regimes (M7–M8)</a></li>
   <li><a href="#sec-subsamples" id="toc-sec-subsamples" class="nav-link" data-scroll-target="#sec-subsamples"><span class="header-section-number">4.6</span> Subsamples</a></li>
+  <li><a href="#sec-backfill" id="toc-sec-backfill" class="nav-link" data-scroll-target="#sec-backfill"><span class="header-section-number">4.7</span> Backfilled index values</a></li>
   </ul></li>
   <li><a href="#reproducibility" id="toc-reproducibility" class="nav-link" data-scroll-target="#reproducibility"><span class="header-section-number">5</span> Reproducibility</a></li>
   </ul>
@@ -2186,7 +2187,7 @@ vertical-align: -.125em;
     <div>
     <div class="quarto-title-meta-heading">Published</div>
     <div class="quarto-title-meta-contents">
-      <p class="date">September 25, 2026</p>
+      <p class="date">September 26, 2026</p>
     </div>
   </div>
   
@@ -2242,6 +2243,7 @@ vertical-align: -.125em;
 <li><strong>Break tests agree.</strong> strucchange, ecp and PELT locate breaks around the 2003 pound float, the 2008 crisis, 2011–12 and the 2020 COVID shock.</li>
 <li><strong>Regime-switching volatility fits better.</strong> MS-GJR-t beats single-regime GJR-t by BIC, with daily volatilities of 1.14% and 1.98% and very persistent regimes. TV-GARCH detects a shift in unconditional variance.</li>
 </ul></li>
+<li><strong>Backfill (CBE Annual Report 2002/2003).</strong> Values before 2 February 2003 are retroactive reconstructions (<a href="#sec-backfill" class="quarto-xref">Section 4.7</a>). The backfilled segment differs in level and shape: lower variance (F-test p = 0.0007), thinner tails and more flat days. Its lag-1 autocorrelation is not significantly different (p = 0.33), and the Chow test finds no AR(1) break at the launch (p = 0.09). λ̂ is negative and rejects chaos in every segment. No conclusion depends on the backfilled years; the weak long-memory evidence comes from the live period.</li>
 <li><strong>M8: subsamples.</strong> λ̂ is negative in every subsample, before and after the November 2016 float, and dropping the 2011 closure return changes nothing. The magnitude of λ̂ is unstable across subsamples (the neural-net estimator is noisy); its sign is not.</li>
 </ul>
 </section>
@@ -6141,6 +6143,194 @@ Figure 7: MS-GJR-t smoothed probability of the high-volatility regime, with PEL
 </div>
 </div>
 <p>Dropping the 2011 closure-spanning return: N = 6280, max |W| = 2.45, min p = 0.014.</p>
+</section>
+<section id="sec-backfill" class="level2" data-number="4.7">
+<h2 data-number="4.7" class="anchored" data-anchor-id="sec-backfill"><span class="header-section-number">4.7</span> Backfilled index values</h2>
+<p>CASE 30 was launched on 2 February 2003 to replace CASE 50. It “was retroactively calculated for five years as of 1/1/1998” (CBE Annual Report 2002/2003, p. 87). Every value before the launch, including the paper’s first years, is therefore a reconstruction from the 30 stocks that were most liquid in 2003, not a published index. The table repeats the main diagnostics on the backfilled and live segments. <code>near_zero_pct</code> is the share of days with |r| &lt; 0.01%, a proxy for thin trading. Annualised figures use 245 days.</p>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 15%">
+<col style="width: 2%">
+<col style="width: 5%">
+<col style="width: 4%">
+<col style="width: 3%">
+<col style="width: 3%">
+<col style="width: 5%">
+<col style="width: 2%">
+<col style="width: 5%">
+<col style="width: 2%">
+<col style="width: 2%">
+<col style="width: 5%">
+<col style="width: 7%">
+<col style="width: 5%">
+<col style="width: 6%">
+<col style="width: 2%">
+<col style="width: 2%">
+<col style="width: 2%">
+<col style="width: 2%">
+<col style="width: 3%">
+<col style="width: 6%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">segment</th>
+<th style="text-align: right;">N</th>
+<th style="text-align: right;">mean_ann_pct</th>
+<th style="text-align: right;">sd_ann_pct</th>
+<th style="text-align: right;">skewness</th>
+<th style="text-align: right;">kurtosis</th>
+<th style="text-align: right;">near_zero_pct</th>
+<th style="text-align: right;">acf1</th>
+<th style="text-align: right;">ljung_box20_p</th>
+<th style="text-align: right;">VR2</th>
+<th style="text-align: right;">VR2_z2</th>
+<th style="text-align: right;">bds_raw_maxW</th>
+<th style="text-align: right;">bds_gjr_max_absW</th>
+<th style="text-align: right;">bds_gjr_min_p</th>
+<th style="text-align: right;">gjr_persistence</th>
+<th style="text-align: right;">H_AL</th>
+<th style="text-align: right;">lw_d</th>
+<th style="text-align: right;">lw_se</th>
+<th style="text-align: right;">lo_V</th>
+<th style="text-align: right;">lle</th>
+<th style="text-align: right;">lle_p_H0_chaos</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">backfilled (2000 - Jan 2003)</td>
+<td style="text-align: right;">761</td>
+<td style="text-align: right;">-23.312</td>
+<td style="text-align: right;">25.336</td>
+<td style="text-align: right;">0.375</td>
+<td style="text-align: right;">4.704</td>
+<td style="text-align: right;">1.183</td>
+<td style="text-align: right;">0.197</td>
+<td style="text-align: right;">0.326</td>
+<td style="text-align: right;">1.180</td>
+<td style="text-align: right;">3.877</td>
+<td style="text-align: right;">40.357</td>
+<td style="text-align: right;">2.643</td>
+<td style="text-align: right;">0.008</td>
+<td style="text-align: right;">0.999</td>
+<td style="text-align: right;">0.492</td>
+<td style="text-align: right;">-0.007</td>
+<td style="text-align: right;">0.058</td>
+<td style="text-align: right;">1.341</td>
+<td style="text-align: right;">-10.262</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">live, paper window (Feb 2003 - 2015)</td>
+<td style="text-align: right;">3133</td>
+<td style="text-align: right;">19.552</td>
+<td style="text-align: right;">27.983</td>
+<td style="text-align: right;">-0.521</td>
+<td style="text-align: right;">12.665</td>
+<td style="text-align: right;">0.638</td>
+<td style="text-align: right;">0.159</td>
+<td style="text-align: right;">0.001</td>
+<td style="text-align: right;">1.143</td>
+<td style="text-align: right;">4.052</td>
+<td style="text-align: right;">22.404</td>
+<td style="text-align: right;">2.065</td>
+<td style="text-align: right;">0.039</td>
+<td style="text-align: right;">0.931</td>
+<td style="text-align: right;">0.517</td>
+<td style="text-align: right;">0.067</td>
+<td style="text-align: right;">0.037</td>
+<td style="text-align: right;">1.879</td>
+<td style="text-align: right;">-2.769</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">live, full (Feb 2003 - 2025)</td>
+<td style="text-align: right;">5520</td>
+<td style="text-align: right;">18.633</td>
+<td style="text-align: right;">25.270</td>
+<td style="text-align: right;">-0.502</td>
+<td style="text-align: right;">12.509</td>
+<td style="text-align: right;">0.779</td>
+<td style="text-align: right;">0.158</td>
+<td style="text-align: right;">0.000</td>
+<td style="text-align: right;">1.147</td>
+<td style="text-align: right;">5.472</td>
+<td style="text-align: right;">30.153</td>
+<td style="text-align: right;">2.573</td>
+<td style="text-align: right;">0.010</td>
+<td style="text-align: right;">0.963</td>
+<td style="text-align: right;">0.539</td>
+<td style="text-align: right;">0.070</td>
+<td style="text-align: right;">0.030</td>
+<td style="text-align: right;">2.093</td>
+<td style="text-align: right;">-3.199</td>
+<td style="text-align: right;">0</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">paper window (2000 - 2015)</td>
+<td style="text-align: right;">3894</td>
+<td style="text-align: right;">11.175</td>
+<td style="text-align: right;">27.504</td>
+<td style="text-align: right;">-0.376</td>
+<td style="text-align: right;">11.534</td>
+<td style="text-align: right;">0.745</td>
+<td style="text-align: right;">0.180</td>
+<td style="text-align: right;">0.002</td>
+<td style="text-align: right;">1.181</td>
+<td style="text-align: right;">5.457</td>
+<td style="text-align: right;">28.958</td>
+<td style="text-align: right;">1.819</td>
+<td style="text-align: right;">0.069</td>
+<td style="text-align: right;">0.967</td>
+<td style="text-align: right;">0.520</td>
+<td style="text-align: right;">0.071</td>
+<td style="text-align: right;">0.034</td>
+<td style="text-align: right;">2.031</td>
+<td style="text-align: right;">-0.620</td>
+<td style="text-align: right;">0</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<p>Formal tests of a change at the launch date:</p>
+<div class="cell">
+<div class="cell-output-display">
+<table class="caption-top table table-sm table-striped small">
+<colgroup>
+<col style="width: 79%">
+<col style="width: 11%">
+<col style="width: 9%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: left;">test</th>
+<th style="text-align: right;">statistic</th>
+<th style="text-align: right;">p_value</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: left;">Chow test, AR(1) coefficients at 2 Feb 2003 (paper window)</td>
+<td style="text-align: right;">2.3911</td>
+<td style="text-align: right;">0.0917</td>
+</tr>
+<tr class="even">
+<td style="text-align: left;">Lag-1 autocorrelation equal (Fisher z), backfilled vs live 2003-2015</td>
+<td style="text-align: right;">0.9714</td>
+<td style="text-align: right;">0.3314</td>
+</tr>
+<tr class="odd">
+<td style="text-align: left;">Variance equal (F test), backfilled vs live 2003-2015</td>
+<td style="text-align: right;">0.8197</td>
+<td style="text-align: right;">0.0007</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
 </section>
 </section>
 <section id="reproducibility" class="level1" data-number="5">
